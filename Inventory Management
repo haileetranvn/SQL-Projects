@@ -1,0 +1,67 @@
+Scenario: Inventory Analysis for Restocking Decisions
+
+Objective: Determine which products need to be restocked, identify the fastest-moving items over the last quarter, and assess supplier reliability in terms of lead time.
+
+Database Schema
+- `products` (product_id, name, supplier_id, price)
+- `suppliers` (supplier_id, name, lead_time_days)
+- `inventory_levels` (product_id, date, quantity)
+- `orders` (order_id, product_id, order_date, quantity_ordered)
+
+Complex SQL Query
+This SQL query integrates data across all tables to provide insights into inventory needs, product movement, and supplier performance:
+
+WITH OrderedProducts AS (
+    SELECT
+        product_id,
+        SUM(quantity_ordered) AS total_ordered,
+        RANK() OVER (ORDER BY SUM(quantity_ordered) DESC) AS rank
+    FROM orders
+    WHERE order_date BETWEEN DATE_SUB(CURDATE(), INTERVAL 3 MONTH) AND CURDATE()
+    GROUP BY product_id
+),
+LowStock AS (
+    SELECT
+        i.product_id,
+        p.name,
+        MIN(i.quantity) AS min_quantity
+    FROM inventory_levels i
+    JOIN products p ON i.product_id = p.product_id
+    WHERE i.date BETWEEN DATE_SUB(CURDATE(), INTERVAL 1 MONTH) AND CURDATE()
+    GROUP BY i.product_id
+    HAVING min_quantity < 20 -- Threshold for restocking might vary
+),
+SupplierLeadTimes AS (
+    SELECT
+        p.product_id,
+        s.name AS supplier_name,
+        AVG(s.lead_time_days) AS average_lead_time
+    FROM suppliers s
+    JOIN products p ON s.supplier_id = p.supplier_id
+    GROUP BY p.product_id
+)
+
+SELECT
+    op.product_id,
+    p.name,
+    ls.min_quantity AS current_stock,
+    op.total_ordered AS total_orders_last_quarter,
+    sl.supplier_name,
+    sl.average_lead_time,
+    CASE
+        WHEN op.rank <= 5 THEN 'High'
+        WHEN op.rank BETWEEN 6 AND 15 THEN 'Medium'
+        ELSE 'Low'
+    END AS demand_level
+FROM OrderedProducts op
+JOIN products p ON op.product_id = p.product_id
+JOIN LowStock ls ON op.product_id = ls.product_id
+JOIN SupplierLeadTimes sl ON op.product_id = sl.product_id
+ORDER BY op.rank;
+
+Explanation:
+1. **OrderedProducts CTE (Common Table Expression)**: Calculates total orders for each product in the last quarter and ranks products by the volume of orders.
+2. **LowStock CTE**: Identifies products with low stock levels (below a threshold, e.g., 20 units) over the last month.
+3. **SupplierLeadTimes CTE**: Provides average lead times for each supplier based on the products they supply.
+4. **Final SELECT**: Combines all CTEs to provide a comprehensive view of each product’s demand level, current stock, total orders in the last quarter, supplier, and average lead time. It also categorizes demand levels based on order volume rankings.
+
