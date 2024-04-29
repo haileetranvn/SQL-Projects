@@ -64,3 +64,97 @@ ELSE "F"
 END AS "RESULT"
 FROM  solar_system_objects
 GROUP BY RESULT;
+
+1. Basic Data Retrieval
+Fetch all information about planets only.
+
+SELECT *
+FROM solar_system_objects
+WHERE type_of_object LIKE 'planet%';
+
+2. Aggregation
+Calculate the average mass and density of different types of solar system objects.
+
+SELECT type_of_object, AVG(mass) AS average_mass, AVG(density) AS average_density
+FROM solar_system_objects
+GROUP BY type_of_object;
+
+3. Sorting and Filtering
+Retrieve the top 5 heaviest objects in the solar system, excluding the Sun.
+
+SELECT body, mass
+FROM solar_system_objects
+WHERE body != 'Sun'
+ORDER BY mass DESC
+LIMIT 5;
+
+4. Join Operations
+Assuming there's another table that contains missions to these objects (`missions` table with columns `mission_name`, `target_body`), find all missions targeting gas giants.
+
+SELECT m.mission_name, s.body
+FROM missions m
+JOIN solar_system_objects s ON m.target_body = s.body
+WHERE s.type_of_object = 'planet (gas giant) has rings';
+
+5. Subqueries and Common Table Expressions (CTEs)
+List the bodies that have a mass greater than the average mass of all solar system objects.
+
+
+WITH AverageMass AS (
+    SELECT AVG(mass) AS avg_mass
+    FROM solar_system_objects
+)
+
+SELECT body, mass
+FROM solar_system_objects
+WHERE mass > (SELECT avg_mass FROM AverageMass);
+
+6. Using Window Functions
+Rank solar system objects by their mass within each type of object.
+
+SELECT body, type_of_object, mass,
+       RANK() OVER (PARTITION BY type_of_object ORDER BY mass DESC) AS mass_rank
+FROM solar_system_objects;
+
+7. Update Statements
+Assume you want to correct an error in the type of object, here's how you'd update it.
+
+UPDATE solar_system_objects
+SET type_of_object = 'dwarf planet'
+WHERE body = 'PlutoR';
+
+8. Complex Query
+Find the density-to-mass ratio for each object and compare it with the average ratio for all objects.
+
+WITH DensityMassRatio AS (
+    SELECT body, (density/mass) AS ratio
+    FROM solar_system_objects
+)
+
+, AverageRatio AS (
+    SELECT AVG(ratio) AS avg_ratio
+    FROM DensityMassRatio
+)
+
+SELECT d.body, d.ratio, a.avg_ratio,
+       CASE WHEN d.ratio > a.avg_ratio THEN 'Above average'
+            ELSE 'Below average'
+       END AS comparison
+FROM DensityMassRatio d, AverageRatio a;
+
+9. Creating Views
+Create a view that simplifies access to frequently needed data about terrestrial planets.
+
+CREATE VIEW terrestrial_planets AS
+SELECT body, mean_radius, mass, density
+FROM solar_system_objects
+WHERE type_of_object LIKE 'planet (terrestrial)';
+```
+
+10. Deleting Records
+Safely delete a record for a hypothetical object that might have been added in error.
+
+DELETE FROM solar_system_objects
+WHERE body = 'FictitiousObject';
+
+
