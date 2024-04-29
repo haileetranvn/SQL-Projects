@@ -1,0 +1,104 @@
+Database Schema Design
+This schema will include tables necessary for tracking sales, inventory, and customer interactions:
+
+
+CREATE TABLE products (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    price DECIMAL(10,2) NOT NULL,
+    supplier_id INT
+);
+
+
+CREATE TABLE suppliers (
+    supplier_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    contact_name VARCHAR(255),
+    phone VARCHAR(20),
+    address VARCHAR(255),
+    lead_time_days INT
+);
+
+
+CREATE TABLE inventory (
+    inventory_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT,
+    store_id INT,
+    quantity INT DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+
+CREATE TABLE stores (
+    store_id INT AUTO_INCREMENT PRIMARY KEY,
+    location VARCHAR(255) NOT NULL
+);
+
+-- Sales table
+CREATE TABLE sales (
+    sale_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT,
+    store_id INT,
+    sale_date DATE,
+    quantity INT,
+    total_amount DECIMAL(10, 2),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    FOREIGN KEY (store_id) REFERENCES stores(store_id)
+);
+
+
+CREATE TABLE customers (
+    customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255)
+);
+
+
+CREATE TABLE customer_transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT,
+    sale_id INT,
+    transaction_date DATE,
+    amount_spent DECIMAL(10, 2),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    FOREIGN KEY (sale_id) REFERENCES sales(sale_id)
+);
+
+
+Complex SQL Query for Executive Reporting
+
+WITH MonthlySales AS (
+    SELECT
+        DATE_FORMAT(s.sale_date, '%Y-%m') AS month,
+        p.category,
+        SUM(s.quantity) AS total_quantity_sold,
+        SUM(s.total_amount) AS total_revenue
+    FROM sales s
+    JOIN products p ON s.product_id = p.product_id
+    GROUP BY month, p.category
+),
+InventoryOverview AS (
+    SELECT
+        p.category,
+        SUM(i.quantity) AS total_stock
+    FROM inventory i
+    JOIN products p ON i.product_id = p.product_id
+    GROUP BY p.category
+)
+
+SELECT
+    ms.month,
+    ms.category,
+    ms.total_quantity_sold,
+    ms.total_revenue,
+    io.total_stock
+FROM MonthlySales ms
+JOIN InventoryOverview io ON ms.category = io.category
+ORDER BY ms.month DESC, ms.total_revenue DESC;
+
+Explanation:
+1. **MonthlySales CTE**: Calculates total quantity sold and total revenue by product category for each month.
+2. **InventoryOverview CTE**: Provides a current overview of the stock available by category.
+3. **Final SELECT**: Combines the sales and inventory data to present a monthly report detailing revenue, units sold, and remaining stock by category. This helps executives visualize performance trends and make informed decisions about restocking, promotions, or discontinuing certain product lines.
+
